@@ -1,0 +1,21 @@
+// 项目级 build.gradle（根目录）
+// 注意：本文件使用传统 buildscript 写法，兼容 Android Gradle Plugin 8.2.x
+buildscript {
+    ext {
+        // 明确的依赖版本号
+        kotlin_version = '1.9.22'
+        agp_version = '8.2.2'
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:$agp_version"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}

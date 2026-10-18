@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 主题色与海边背景图协调的天蓝色系 -->
+    <color name="sky_300">#4FC3F7</color>
+    <color name="sky_700">#0277BD</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
+    <color name="log_bg">#80FFFFFF</color>
+</resources>

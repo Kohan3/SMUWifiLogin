@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SMU校园网一键连</string>
+    <string name="app_title">南方医科大学 校园网认证</string>
+    <string name="hint_username">学号 / 工号（账号）</string>
+    <string name="hint_password">密码（本地保存，不上传）</string>
+    <string name="scheme_native">方案一：原生请求</string>
+    <string name="scheme_webview">方案二：WebView 注入</string>
+    <string name="btn_connect">一键连接</string>
+    <string name="btn_logout">注销 / 断开</string>
+    <string name="btn_advanced">高级设置（触发 URL / 选择器 / 注销地址）</string>
+    <string name="hint_trigger">触发 URL（默认 http://1.1.1.1）</string>
+    <string name="hint_verify">连通性验证 URL（默认 http://www.baidu.com）</string>
+    <string name="hint_user_selector">账号输入框 CSS 选择器</string>
+    <string name="hint_pass_selector">密码输入框 CSS 选择器</string>
+    <string name="hint_agree_selector">同意勾选框 CSS 选择器</string>
+    <string name="hint_submit_selector">登录按钮 CSS 选择器</string>
+    <string name="hint_logout_url">注销地址（留空则自动派生）</string>
+    <string name="log_title">运行日志</string>
+</resources>
