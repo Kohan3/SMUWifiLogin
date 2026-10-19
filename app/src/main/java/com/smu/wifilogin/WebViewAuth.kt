@@ -9,15 +9,14 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 
 /**
- * 方案二：WebView 注入（备选 / 兜底）—— 智能注入版 v3（支持 iframe）
+ * 方案二：WebView 注入（备选 / 兜底）—— 智能注入版 v4
  *
- * 相比初版的改进：
- *  1. iframe 递归注入：很多校园网 Portal 把登录表单嵌在 iframe 里，
- *     主页面 querySelector 永远查不到。v3 会递归钻进所有同源 iframe 找表单。
- *  2. 账号框智能定位：选择器命中失败时，自动找「密码框前面最近的可见文本输入框」。
- *  3. 登录按钮智能定位：选择器失败时按按钮文字（登录/login/连接）查找，
- *     最后兜底提交包含密码框的表单。
- *  4. 返回结果带 frames 数量和命中位置，便于继续排查。
+ * v4 修复：
+ *  1. 【关键修复】v3 只找到了密码框但从未把密码值写进去（p 只代表“找到了密码框”），
+ *     导致认证服务器报「用户密码不允许为空」。v4 真正写入密码。
+ *  2. 写入方式升级：使用原生 value setter + input/change 事件，
+ *     兼容 Vue / React 等前端框架渲染的登录页（防止直接改 .value 被框架忽略/清空）。
+ *  3. 保留 v3 的递归 iframe、账号智能定位、按钮智能定位。
  */
 @SuppressLint("SetJavaScriptEnabled")
 class WebViewAuth(
@@ -82,7 +81,7 @@ class WebViewAuth(
         webView.loadUrl(config.triggerUrl)
     }
 
-    /** 注入 JS：递归遍历主页面 + 所有同源 iframe，智能填充账号密码并点击登录 */
+    /** 注入 JS：递归遍历主页面 + 所有同源 iframe，真正写入账号与密码并点击登录 */
     private fun attemptInject(view: WebView?) {
         val user = config.username.replace("\\", "\\\\").replace("'", "\\'")
         val pass = config.password.replace("\\", "\\\\").replace("'", "\\'")
@@ -106,15 +105,24 @@ class WebViewAuth(
                 try{ el.dispatchEvent(new Event('input',{bubbles:true})); }catch(e){}
                 try{ el.dispatchEvent(new Event('change',{bubbles:true})); }catch(e){}
             }
+            /* 原生 setter 写入：兼容 Vue/React 等框架，避免直接改 .value 被框架忽略 */
+            function setValue(el, val){
+                try{
+                    var proto = (el.tagName === 'TEXTAREA') ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+                    var desc = Object.getOwnPropertyDescriptor(proto, 'value');
+                    if(desc && desc.set){ desc.set.call(el, val); } else { el.value = val; }
+                }catch(e){ try{ el.value = val; }catch(e2){} }
+                try{ if(el._valueTracker){ el._valueTracker.setValue(''); } }catch(e){}
+                try{ el.focus(); }catch(e){}
+                fire(el);
+            }
             function fillBySelector(doc, sel, val){
                 try{
                     var els = doc.querySelectorAll(sel);
                     for(var i=0;i<els.length;i++){
                         if(visible(els[i])){
-                            els[i].value = val;
-                            try{ els[i].focus(); }catch(e){}
-                            fire(els[i]);
-                            return true;
+                            setValue(els[i], val);
+                            return (els[i].value === val);
                         }
                     }
                 }catch(e){}
@@ -139,7 +147,15 @@ class WebViewAuth(
                 }
                 if(!pass) return false;
 
-                // ---- 账号：先按选择器，失败则找密码框前面最近的可见文本输入框 ----
+                /* ---- 密码：先按选择器填，失败则直接写入找到的密码框【v4 关键修复】---- */
+                var pOk = fillBySelector(doc, PASSSEL, PASSVAL);
+                if(!pOk){
+                    setValue(pass, PASSVAL);
+                    pOk = (pass.value === PASSVAL);
+                }
+                res.p = pOk;
+
+                /* ---- 账号：先按选择器，失败则找密码框前面最近的可见文本输入框 ---- */
                 var uOk = fillBySelector(doc, USERSEL, USERVAL);
                 if(!uOk){
                     var best = null;
@@ -153,15 +169,13 @@ class WebViewAuth(
                         }
                     }
                     if(best){
-                        best.value = USERVAL;
-                        try{ best.focus(); }catch(e){}
-                        fire(best);
-                        uOk = true;
+                        setValue(best, USERVAL);
+                        uOk = (best.value === USERVAL);
                     }
                 }
-                res.u = uOk; res.p = true;
+                res.u = uOk;
 
-                // ---- 同意勾选框 ----
+                /* ---- 同意勾选框 ---- */
                 try{
                     if(!clickIn(doc, AGREESEL)){
                         var cbs = doc.querySelectorAll('input[type=checkbox]');
@@ -172,7 +186,7 @@ class WebViewAuth(
                     res.a = true;
                 }catch(e){}
 
-                // ---- 登录按钮 ----
+                /* ---- 登录按钮 ---- */
                 var sOk = clickIn(doc, SUBMITSEL);
                 if(!sOk){
                     var words = ['登录','登 录','login','sign in','连接','认证'];
@@ -220,19 +234,19 @@ class WebViewAuth(
                 return false;
             }
             walk(window);
-            if(!res.p){ res.where = 'no-password-found-in-' + res.frames + '-frame(s)'; }
+            if(!res.p){ res.where = 'password-not-filled-in-' + res.frames + '-frame(s)'; }
             return JSON.stringify(res);
         })();
         """.trimIndent()
 
-        log("注入 JS（v3 递归 iframe 版）填充账号密码并点击登录")
+        log("注入 JS（v4 真实写入账号+密码版）")
         log("  账号选择器=$userSel | 密码选择器=$passSel")
         log("  同意选择器=$agreeSel | 提交选择器=$submitSel")
 
         view?.evaluateJavascript(js) { result ->
             log("注入执行返回: $result")
             if (result != null && result.contains("\"p\":false")) {
-                log("⚠️ 所有页面/iframe 里都没找到密码框（共扫描 ${result} 中 frames 字段所示数量）。请把该日志发我，或直接在 WebView 手动登录。")
+                log("⚠️ 密码写入失败（p:false）。请把该日志截图发我。")
             }
         }
     }
