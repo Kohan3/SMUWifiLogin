@@ -2,7 +2,7 @@ package com.smu.wifilogin
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
-import android.os.Build
+import android.os.Build 
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
